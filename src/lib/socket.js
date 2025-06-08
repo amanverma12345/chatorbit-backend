@@ -1,41 +1,43 @@
-// lib/socket.js
 import { Server } from "socket.io";
+import http from "http";
+import express from "express";
 
-const userSocketMap = {}; // { userId: socketId }
-let io; // declare io at module level
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:5173", "https://chatorbit-frontend.vercel.app"],
+  },
+});
+
+// used to store online users
+const userSocketMap = {}; // {userId: socketId}
 
 export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
 
-export function setupSocket(server) {
-  io = new Server(server, {
-    cors: {
-      origin: ["http://localhost:5173", "https://chatorbit-frontend.vercel.app"],
-      credentials: true,
-    },
-  });
+io.on("connection", (socket) => {
+  console.log("A user connected", socket.id);
 
-  io.on("connection", (socket) => {
-    console.log("A user connected", socket.id);
+  // ✅ safer parsing of query
+  const url = new URL(`http://localhost?${socket.handshake.url.split("?")[1] || ""}`);
+  const userId = url.searchParams.get("userId");
 
-    // ✅ Use socket.handshake.query (no need to manually parse URLs)
-    const userId = socket.handshake.query?.userId;
+  if (userId) {
+    userSocketMap[userId] = socket.id;
+  }
 
+  io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+  socket.on("disconnect", () => {
+    console.log("A user disconnected", socket.id);
     if (userId) {
-      userSocketMap[userId] = socket.id;
+      delete userSocketMap[userId];
     }
-
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
-
-    socket.on("disconnect", () => {
-      console.log("A user disconnected", socket.id);
-      if (userId) {
-        delete userSocketMap[userId];
-      }
-      io.emit("getOnlineUsers", Object.keys(userSocketMap));
-    });
   });
-}
+});
 
-export { io };
+export { io, app, server };
