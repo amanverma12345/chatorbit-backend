@@ -19,8 +19,8 @@ export function setupSocket(server) {
   io.on("connection", (socket) => {
     console.log("A user connected", socket.id);
 
-    const url = new URL(`http://localhost?${socket.handshake.url.split("?")[1] || ""}`);
-    const userId = url.searchParams.get("userId");
+    // ✅ Use socket.handshake.query (no need to manually parse URLs)
+    const userId = socket.handshake.query?.userId;
 
     if (userId) {
       userSocketMap[userId] = socket.id;
